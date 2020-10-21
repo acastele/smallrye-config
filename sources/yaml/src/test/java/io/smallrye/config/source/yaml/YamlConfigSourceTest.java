@@ -147,26 +147,39 @@ public class YamlConfigSourceTest {
     @Test
     void expressions() {
         SmallRyeConfig config = new SmallRyeConfigBuilder()
-            .addDefaultSources()
-            .addDefaultInterceptors()
-            .withSources(new YamlConfigSource("yaml", "block:\n" +
-                                                      "  expression: ${block_expression}\n" +
-                                                      "  inline: \"[{type: test, host: localhost, port: 443, scheme: https}]\""))
-            .withConverter(Server.class, 100, value -> new Yaml().loadAs(value, Server.class))
-            .build();
+                .addDefaultSources()
+                .addDefaultInterceptors()
+                .withSources(new YamlConfigSource("yaml", "block:\n" +
+                        "  expression:\n" +
+                        "     servers: ${block_expression}\n" +
+                        "  inline:\n" +
+                        "     servers: [{type: test, host: localhost, port: 443, scheme: https}]"))
+                .withConverter(Servers.class, 100, value -> new Yaml().loadAs(value, Servers.class))
+                .build();
 
+        assertEquals("[{type: test, host: localhost, port: 443, scheme: https}]", config.getRawValue("block.expression.servers"));
+        assertEquals("{\"servers\": [{\"type\": \"test\", \"host\": \"localhost\", \"port\": !!int \"443\", \"scheme\": \"https\"}]}\n", config.getRawValue("block.inline.servers"));
 
-        assertEquals("[{type: test, host: localhost, port: 443, scheme: https}]", config.getRawValue("block.expression"));
-        assertEquals("[{type: test, host: localhost, port: 443, scheme: https}]", config.getRawValue("block.inline"));
+        assertThrows(Exception.class, () -> config.getValue("block.expression.servers", Servers.class));
+        assertEquals(443, config.getValue("block.inline.servers", Servers.class).getServers().get(0).port);
+    }
 
-        assertThrows(Exception.class, () -> config.getValue("block.expression", Server.class));
-        assertThrows(Exception.class, () -> config.getValue("block.inline", Server.class));
+    public static class Servers {
+        List<Server> servers;
+
+        public List<Server> getServers() {
+            return servers;
+        }
+
+        public void setServers(List<Server> servers) {
+            this.servers = servers;
+        }
     }
 
     public static class Server {
         String type;
         String host;
-        String port;
+        int port;
         String scheme;
 
         public String getType() {
@@ -185,11 +198,11 @@ public class YamlConfigSourceTest {
             this.host = host;
         }
 
-        public String getPort() {
+        public int getPort() {
             return port;
         }
 
-        public void setPort(final String port) {
+        public void setPort(final int port) {
             this.port = port;
         }
 
