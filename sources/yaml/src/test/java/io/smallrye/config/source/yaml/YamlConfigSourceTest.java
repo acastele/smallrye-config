@@ -4,6 +4,7 @@ import static java.util.stream.Collectors.toList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -12,6 +13,8 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import org.eclipse.microprofile.config.spi.Converter;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.yaml.snakeyaml.Yaml;
 
@@ -134,6 +137,69 @@ public class YamlConfigSourceTest {
                 .withConverter(Users.class, 100, new UserConverter())
                 .build();
 
+    }
+
+    @BeforeAll
+    static void beforeAll() {
+        System.setProperty("block_expression", "[{type: test, host: localhost, port: 443, scheme: https}]");
+    }
+
+    @Test
+    void expressions() {
+        SmallRyeConfig config = new SmallRyeConfigBuilder()
+            .addDefaultSources()
+            .addDefaultInterceptors()
+            .withSources(new YamlConfigSource("yaml", "block:\n" +
+                                                      "  expression: ${block_expression}\n" +
+                                                      "  inline: \"[{type: test, host: localhost, port: 443, scheme: https}]\""))
+            .withConverter(Server.class, 100, value -> new Yaml().loadAs(value, Server.class))
+            .build();
+
+
+        assertEquals("[{type: test, host: localhost, port: 443, scheme: https}]", config.getRawValue("block.expression"));
+        assertEquals("[{type: test, host: localhost, port: 443, scheme: https}]", config.getRawValue("block.inline"));
+
+        assertThrows(Exception.class, () -> config.getValue("block.expression", Server.class));
+        assertThrows(Exception.class, () -> config.getValue("block.inline", Server.class));
+    }
+
+    public static class Server {
+        String type;
+        String host;
+        String port;
+        String scheme;
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(final String type) {
+            this.type = type;
+        }
+
+        public String getHost() {
+            return host;
+        }
+
+        public void setHost(final String host) {
+            this.host = host;
+        }
+
+        public String getPort() {
+            return port;
+        }
+
+        public void setPort(final String port) {
+            this.port = port;
+        }
+
+        public String getScheme() {
+            return scheme;
+        }
+
+        public void setScheme(final String scheme) {
+            this.scheme = scheme;
+        }
     }
 
     public static class Users {
