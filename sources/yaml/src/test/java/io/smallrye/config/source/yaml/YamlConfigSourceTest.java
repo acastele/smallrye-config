@@ -13,7 +13,6 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import org.eclipse.microprofile.config.spi.Converter;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.yaml.snakeyaml.Yaml;
@@ -141,7 +140,7 @@ public class YamlConfigSourceTest {
 
     @BeforeAll
     static void beforeAll() {
-        System.setProperty("block_expression", "[{type: test, host: localhost, port: 443, scheme: https}]");
+        System.setProperty("block_expression", "servers: [{type: test, host: localhost, port: 443, scheme: https}]");
     }
 
     @Test
@@ -151,16 +150,19 @@ public class YamlConfigSourceTest {
                 .addDefaultInterceptors()
                 .withSources(new YamlConfigSource("yaml", "block:\n" +
                         "  expression:\n" +
-                        "     servers: ${block_expression}\n" +
+                        "     ${block_expression}\n" +
                         "  inline:\n" +
                         "     servers: [{type: test, host: localhost, port: 443, scheme: https}]"))
                 .withConverter(Servers.class, 100, value -> new Yaml().loadAs(value, Servers.class))
                 .build();
 
-        assertEquals("[{type: test, host: localhost, port: 443, scheme: https}]", config.getRawValue("block.expression.servers"));
-        assertEquals("{\"servers\": [{\"type\": \"test\", \"host\": \"localhost\", \"port\": !!int \"443\", \"scheme\": \"https\"}]}\n", config.getRawValue("block.inline.servers"));
+        assertEquals("servers: [{type: test, host: localhost, port: 443, scheme: https}]",
+                config.getRawValue("block.expression"));
+        assertEquals(
+                "{\"servers\": [{\"type\": \"test\", \"host\": \"localhost\", \"port\": !!int \"443\", \"scheme\": \"https\"}]}\n",
+                config.getRawValue("block.inline.servers"));
 
-        assertThrows(Exception.class, () -> config.getValue("block.expression.servers", Servers.class));
+        assertEquals(443, config.getValue("block.expression", Servers.class).getServers().get(0).port);
         assertEquals(443, config.getValue("block.inline.servers", Servers.class).getServers().get(0).port);
     }
 
